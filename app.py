@@ -17,12 +17,11 @@ from orchestrator import ProofCommittee, CommitteeResult
 
 st.set_page_config(
     page_title="Proof Committee",
-    page_icon="📐",
+    page_icon=None,
     layout="wide",
 )
 
-st.title("📐 Proof Committee")
-st.caption("Multi-agent mathematical proof verifier · Prover → Skeptic → Judge")
+st.title("Proof Committee", anchor=False)
 
 # ── Load example proofs ────────────────────────────────────────────────────────
 

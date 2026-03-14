@@ -107,7 +107,7 @@ with col_input:
             height=150,
         )
         if proof.strip():
-            st.markdown(proof)
+            st.markdown("  \n".join(proof.splitlines()))
 
         submit = st.button("Submit to Committee", type="primary", use_container_width=True, key="submit_type")
 

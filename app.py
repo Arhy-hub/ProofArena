@@ -51,7 +51,7 @@ with st.sidebar:
     st.header("Settings")
     model = st.selectbox(
         "Model",
-        ["claude-sonnet-4-20250514", "claude-opus-4-5", "claude-haiku-4-5-20251001"],
+        ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001"],
         index=0,
     )
     n_skeptics = st.slider("Number of Skeptics", min_value=1, max_value=3, value=1)

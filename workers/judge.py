@@ -37,6 +37,27 @@ Output ONLY valid JSON matching this schema exactly. No prose before or after:
   "lean_statement": null
 }
 
+If the majority of steps are CLAIM type with no supporting 
+DEDUCTION steps, or if parse_warnings contain 
+"assertion without justification", return verdict: incomplete 
+regardless of Skeptic results.
+
+base_confidence = 0.60  # start skeptical, not optimistic
+
+Deductions:
+- Each UNCERTAIN step:              -0.15  (was -0.10)
+- Each parse_warning:               -0.10  (was -0.05)
+- Each gap_flag:                    -0.20  (was -0.15)
+- CLAIM step with no DEDUCTION      
+  anywhere in proof:                -0.20  (new)
+- Majority of steps are CLAIM type: -0.25  (new)
+- No testable steps at all:         -0.20  (new)
+- Unnamed lemma invoked:            -0.12  (was -0.08)
+
+If parse_warnings contain "assertion without justification" 
+for more than one step → verdict cannot be "valid", 
+minimum verdict is "incomplete" regardless of confidence score.
+
 Verdict mapping:
 - valid (0.85-1.0): all steps pass, no gaps
 - plausible (0.60-0.84): minor gaps, conclusion probably correct
@@ -61,7 +82,7 @@ def main():
         sys.exit(1)
 
     client = anthropic.Anthropic(api_key=api_key)
-    model = os.environ.get("PROOF_MODEL", "claude-sonnet-4-20250514")
+    model = os.environ.get("PROOF_MODEL", "claude-sonnet-4-6")
 
     response = client.messages.create(
         model=model,

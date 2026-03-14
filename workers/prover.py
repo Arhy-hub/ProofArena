@@ -30,6 +30,8 @@ structured, numbered steps. For each step, identify:
 6. A flag: can_be_tested (true if the step makes a numeric or symbolic claim testable
    over concrete values; false if it is purely structural)
 
+
+
 Output ONLY valid JSON matching this schema exactly. No prose before or after:
 {
   "conjecture": "...",
@@ -45,7 +47,13 @@ Output ONLY valid JSON matching this schema exactly. No prose before or after:
   ],
   "parse_warnings": [],
   "unparseable_fragments": []
-}"""
+}
+
+If a step claims something is true without any mathematical 
+justification, mark it as CLAIM and add to parse_warnings: 
+"Step N: assertion without justification"
+
+"""
 
 
 def main():
@@ -62,7 +70,7 @@ def main():
         sys.exit(1)
 
     client = anthropic.Anthropic(api_key=api_key)
-    model = os.environ.get("PROOF_MODEL", "claude-sonnet-4-20250514")
+    model = os.environ.get("PROOF_MODEL", "claude-sonnet-4-6")
 
     response = client.messages.create(
         model=model,

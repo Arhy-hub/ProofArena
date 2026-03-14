@@ -51,7 +51,12 @@ Output ONLY valid JSON matching this schema exactly. No prose before or after:
   "overall_skeptic_assessment": "PASS|PASS_WITH_GAPS|FAIL|UNCERTAIN",
   "counterexample_found": false,
   "strongest_objection": null
-}"""
+}
+
+If all steps are can_be_tested: false, flag 
+overall_skeptic_assessment: UNCERTAIN with note 
+"No testable mathematical content found."
+"""
 
 
 def _run_numeric_tests(steps: list[dict]) -> dict:
@@ -89,7 +94,7 @@ def main():
         sys.exit(1)
 
     client = anthropic.Anthropic(api_key=api_key)
-    model = os.environ.get("PROOF_MODEL", "claude-sonnet-4-20250514")
+    model = os.environ.get("PROOF_MODEL", "claude-sonnet-4-6")
 
     # Build payload including any pre-run numeric context
     prover_output = data if "steps" in data else data.get("prover_output", data)

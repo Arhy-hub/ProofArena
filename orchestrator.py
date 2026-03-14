@@ -250,7 +250,7 @@ def _majority_skeptic(reports: list[dict]) -> dict:
 # ── Committee class (importable by app.py) ─────────────────────────────────────
 
 class ProofCommittee:
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: str = "claude-sonnet-4-6"):
         self.model = model
 
     def evaluate(self, conjecture: str, proof: str, n_skeptics: int = 1) -> CommitteeResult:
@@ -363,7 +363,7 @@ def main():
     parser = argparse.ArgumentParser(description="Proof Committee — multi-agent proof checker")
     parser.add_argument("--conjecture", required=True, help="The statement being proved")
     parser.add_argument("--proof", required=True, help="The proof text")
-    parser.add_argument("--model", default="claude-sonnet-4-20250514", help="Anthropic model ID")
+    parser.add_argument("--model", default="claude-sonnet-4-6", help="Anthropic model ID")
     parser.add_argument("--skeptics", type=int, default=1, help="Number of skeptic agents")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     args = parser.parse_args()

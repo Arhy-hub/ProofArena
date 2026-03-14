@@ -6,6 +6,7 @@ Run with:
 """
 
 import json
+import tempfile
 import time
 from pathlib import Path
 
@@ -64,6 +65,8 @@ with st.sidebar:
             st.json(r.skeptic_report)
         with st.expander("JudgeVerdict"):
             st.json(r.judge_verdict)
+        with st.expander("LeanSearch"):
+            st.json(r.lean_search)
 
 # ── Input area ─────────────────────────────────────────────────────────────────
 
@@ -75,21 +78,76 @@ with col_examples:
         if st.button(label, use_container_width=True):
             st.session_state["conjecture"] = ex["conjecture"]
             st.session_state["proof"] = ex["proof"]
+            st.session_state["input_tab"] = 0
             st.rerun()
 
+# Input state
+conjecture = ""
+proof = ""
+submit = False
+extraction_method = None
+
 with col_input:
-    conjecture = st.text_input(
-        "Conjecture",
-        value=st.session_state.get("conjecture", ""),
-        placeholder="For all integers n, n² + n is even.",
-    )
-    proof = st.text_area(
-        "Proof",
-        value=st.session_state.get("proof", ""),
-        placeholder="Write the proof here...",
-        height=150,
-    )
-    submit = st.button("Submit to Committee", type="primary", use_container_width=True)
+    tab_type, tab_photo = st.tabs(["Type proof", "Upload photo"])
+
+    # ── Tab 1: Type ──────────────────────────────────────────────────────────
+    with tab_type:
+        conjecture = st.text_input(
+            "Conjecture",
+            value=st.session_state.get("conjecture", ""),
+            placeholder="For all integers n, n² + n is even.",
+        )
+        if conjecture.strip():
+            st.markdown(conjecture)
+
+        proof = st.text_area(
+            "Proof",
+            value=st.session_state.get("proof", ""),
+            placeholder="Write the proof here...",
+            height=150,
+        )
+        if proof.strip():
+            st.markdown(proof)
+
+        submit = st.button("Submit to Committee", type="primary", use_container_width=True, key="submit_type")
+
+    # ── Tab 2: Photo ─────────────────────────────────────────────────────────
+    with tab_photo:
+        img_file = st.file_uploader("Upload a photo of a proof", type=["jpg", "jpeg", "png"], key="img_upload")
+        if img_file:
+            suffix = Path(img_file.name).suffix.lower()
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(img_file.read())
+                tmp_path = tmp.name
+
+            st.image(img_file, use_container_width=True)
+
+            with st.spinner("Extracting proof from image..."):
+                from orchestrator import _call_worker
+                from pathlib import Path as _Path
+                extracted = _call_worker(
+                    _Path("workers/pdf_extractor.py"),
+                    {"file_path": tmp_path, "file_type": "image"},
+                )
+
+            if extracted.get("error") and not extracted.get("conjecture"):
+                st.error(f"Extraction failed: {extracted['error']}")
+            else:
+                extraction_method = extracted.get("extraction_method")
+                conjecture = st.text_input(
+                    "Conjecture (edit if needed)",
+                    value=extracted.get("conjecture") or "",
+                    key="img_conjecture",
+                )
+                proof = st.text_area(
+                    "Proof (edit if needed)",
+                    value=extracted.get("proof") or "",
+                    height=150,
+                    key="img_proof",
+                )
+                if extraction_method:
+                    st.caption(f"Extracted via {extraction_method}")
+                submit = st.button("Submit to Committee", type="primary", use_container_width=True, key="submit_img")
 
 # ── Run pipeline ───────────────────────────────────────────────────────────────
 
@@ -196,5 +254,22 @@ if "result" in st.session_state:
     if r.lean_statement:
         st.subheader("Lean 4 sketch")
         st.code(r.lean_statement, language="lean")
+
+    # ── Formal Verification ────────────────────────────────────────────────────
+    st.subheader("Formal Verification")
+    ls = r.lean_search
+    if ls.get("mathlib_found"):
+        for match in ls["mathlib_matches"]:
+            st.success(f"**Found in Mathlib:** `{match['name']}`")
+            st.code(match["statement"], language="lean")
+            if match.get("docstring"):
+                st.caption(match["docstring"])
+        if ls.get("lean4web_link"):
+            top_name = ls["mathlib_matches"][0]["name"]
+            st.link_button(f"▶ Open in Lean 4 Playground · grounded in `{top_name}`", ls["lean4web_link"])
+    else:
+        st.info("Not found in Mathlib")
+        if ls.get("lean4web_link"):
+            st.link_button("▶ Open in Lean 4 Playground (sketch unverified)", ls["lean4web_link"])
 
     st.caption(f"Completed in {r.duration_ms}ms · Model: {r.model} · {r.timestamp}")

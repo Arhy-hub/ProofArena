@@ -2,12 +2,12 @@
 """
 workers/judge.py — Judge worker
 
-Reads {"prover_output": {...}, "skeptic_report": {...}} JSON from stdin.
+Reads {"prover_output": {...}, "skeptic_report": {...}, "mathlib_context": {...}} JSON from stdin.
 Calls Claude API to synthesise a final verdict.
 Writes JudgeVerdict JSON to stdout.
 
 Usage:
-    echo '{"prover_output": {...}, "skeptic_report": {...}}' | python workers/judge.py
+    echo '{"prover_output": {...}, "skeptic_report": {...}, "mathlib_context": {...}}' | python workers/judge.py
 """
 
 import json
@@ -19,8 +19,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SYSTEM_PROMPT = """You are a mathematical proof judge. You receive both a ProverOutput (structured proof
-steps) and a SkepticReport (test results, gap flags). Synthesise a definitive verdict.
+SYSTEM_PROMPT = """You are a mathematical proof judge. You receive a ProverOutput (structured proof
+steps), a SkepticReport (test results, gap flags), and optionally a mathlib_context with real
+Mathlib theorem matches. Synthesise a definitive verdict.
+
+If mathlib_context.mathlib_found is true, you have access to real Mathlib theorem names.
+Use them when generating the lean_statement field instead of guessing — reference the exact
+declaration names provided (e.g. Even.mul_succ). If mathlib_found is false, generate a
+best-effort sketch marked -- unverified.
 
 Output ONLY valid JSON matching this schema exactly. No prose before or after:
 {

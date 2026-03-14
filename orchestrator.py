@@ -23,6 +23,7 @@ import os
 import subprocess
 import sys
 import time
+import urllib.parse
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -34,6 +35,10 @@ load_dotenv()
 
 ROOT = Path(__file__).parent
 WORKERS = ROOT / "workers"
+
+
+def lean4web_link(sketch: str) -> str:
+    return f"https://live.lean-lang.org/#code={urllib.parse.quote(sketch)}"
 
 
 # ── Data classes ───────────────────────────────────────────────────────────────
@@ -59,6 +64,7 @@ class CommitteeResult:
     prover_output: dict
     skeptic_report: dict
     judge_verdict: dict
+    lean_search: dict
     timeline: list[AgentMessage]
     model: str
     duration_ms: int
@@ -178,16 +184,21 @@ def run_skeptic(prover_output: dict, timeline: list) -> dict:
     return result
 
 
-def run_judge(prover_output: dict, skeptic_report: dict, timeline: list) -> dict:
+def run_judge(prover_output: dict, skeptic_report: dict, lean_search: dict, timeline: list) -> dict:
     timeline.append(AgentMessage(
         role="JUDGE",
         content="Reviewing Prover output and Skeptic report...",
         delay_ms=800,
     ))
 
+    mathlib_context = {
+        "mathlib_found": lean_search.get("mathlib_found", False),
+        "mathlib_matches": lean_search.get("mathlib_matches", []),
+    }
+
     result = _call_worker(
         WORKERS / "judge.py",
-        {"prover_output": prover_output, "skeptic_report": skeptic_report},
+        {"prover_output": prover_output, "skeptic_report": skeptic_report, "mathlib_context": mathlib_context},
     )
 
     if "error" in result:
@@ -253,7 +264,14 @@ class ProofCommittee:
     def __init__(self, model: str = "claude-sonnet-4-6"):
         self.model = model
 
-    def evaluate(self, conjecture: str, proof: str, n_skeptics: int = 1) -> CommitteeResult:
+    def evaluate(
+        self,
+        conjecture: str = "",
+        proof: str = "",
+        n_skeptics: int = 1,
+        file_path: Optional[str] = None,
+        file_type: Optional[str] = None,
+    ) -> CommitteeResult:
         import datetime
         timeline: list[AgentMessage] = []
         t0 = time.time()
@@ -263,6 +281,34 @@ class ProofCommittee:
             content=f"Proof Committee convened. Model: {self.model}. Skeptics: {n_skeptics}.",
             delay_ms=0,
         ))
+
+        # Optional file extraction — runs before everything else
+        if file_path and file_type:
+            timeline.append(AgentMessage(
+                role="SYSTEM",
+                content=f"Extracting proof from {file_type} file...",
+                delay_ms=0,
+            ))
+            extracted = _call_worker(
+                WORKERS / "pdf_extractor.py",
+                {"file_path": file_path, "file_type": file_type},
+            )
+            if extracted.get("error") and not extracted.get("conjecture"):
+                raise RuntimeError(f"Extraction failed: {extracted['error']}")
+            conjecture = extracted.get("conjecture") or conjecture
+            proof = extracted.get("proof") or proof
+            method = extracted.get("extraction_method", "unknown")
+            timeline.append(AgentMessage(
+                role="SYSTEM",
+                content=f"Extraction complete via {method}.",
+                delay_ms=200,
+            ))
+
+        # Step 0: Lean/Mathlib search — runs first, feeds into Judge
+        try:
+            lean_search_result = _call_worker(WORKERS / "lean_search.py", {"conjecture": conjecture})
+        except Exception as e:
+            lean_search_result = {"mathlib_matches": [], "mathlib_found": False, "error": str(e)}
 
         prover_output = run_prover(conjecture, proof, timeline)
 
@@ -280,7 +326,12 @@ class ProofCommittee:
                 delay_ms=400,
             ))
 
-        judge_verdict = run_judge(prover_output, skeptic_report, timeline)
+        judge_verdict = run_judge(prover_output, skeptic_report, lean_search_result, timeline)
+
+        # Generate lean4web link now that Judge has produced a sketch
+        lean_sketch = judge_verdict.get("lean_statement") or ""
+        lean_search_result["lean4web_link"] = lean4web_link(lean_sketch) if lean_sketch else ""
+
         duration_ms = int((time.time() - t0) * 1000)
 
         return CommitteeResult(
@@ -295,6 +346,7 @@ class ProofCommittee:
             prover_output=prover_output,
             skeptic_report=skeptic_report,
             judge_verdict=judge_verdict,
+            lean_search=lean_search_result,
             timeline=timeline,
             model=self.model,
             duration_ms=duration_ms,

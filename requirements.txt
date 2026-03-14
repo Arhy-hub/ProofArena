@@ -3,3 +3,5 @@ sympy>=1.12
 numpy>=1.26
 streamlit>=1.35.0
 python-dotenv>=1.0.0
+lean-explore>=0.1.0
+pillow>=10.0.0

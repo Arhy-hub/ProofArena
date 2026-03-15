@@ -2,6 +2,8 @@
 
 A multi-agent proof verification system. Submit a mathematical conjecture and proof — three AI agents (Prover, Skeptic, Judge) collaborate to verify it.
 
+[video of me yapping about it](https://www.youtube.com/watch?v=erFivunxpzA)
+
 ## How It Works
 
 1. **Prover** — parses the proof into typed steps
